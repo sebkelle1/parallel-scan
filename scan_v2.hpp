@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <numeric>
 
 #include <omp.h>
 
@@ -41,7 +42,7 @@ namespace v2
 template<class T>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
-    constexpr int blockSize = (16384 + 32768) / sizeof(T);
+    constexpr int blockSize = (4096 + 16384) / sizeof(T);
 
     int numThreads = 1;
     #pragma omp parallel
@@ -66,15 +67,8 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
         {
             size_t stepOffset = tid * blockSize;
 
-            T tSum = 0;
-            for (size_t ib = 0; ib < blockSize; ++ib)
-            {
-                size_t i = stepOffset + ib;
-
-                out[i] = tSum;
-                tSum += in[i];
-            }
-            superBlock[0][tid] = tSum;
+            std::exclusive_scan(in + stepOffset, in + stepOffset + blockSize, out + stepOffset, 0);
+            superBlock[0][tid] = out[stepOffset + blockSize - 1] + in[stepOffset + blockSize - 1];
         }
         #pragma omp barrier
 
@@ -88,10 +82,9 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
                 tShiftSum += superBlock[(step+1)%2][t];
 
             if (tid == numThreads - 1)
-            {
                 superBlock[(step+1)%2][numThreads] = tShiftSum + superBlock[(step+1)%2][numThreads - 1];
-            }
 
+            // interleave pre-scanning of <step> block with shifting <step-1> block by previous superBlock sum
             T tLocalSum = 0;
             for (size_t ib = 0; ib < blockSize; ++ib)
             {
@@ -117,25 +110,15 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
                 tSum += superBlock[(nSteps+1)%2][t];
 
             if (tid == numThreads - 1)
-            {
                 superBlock[(nSteps+1)%2][numThreads] = tSum + superBlock[(nSteps+1)%2][numThreads - 1];
-            }
 
             size_t stepOffset = (nSteps-1) * elementsPerStep + tid * blockSize;
-            for (size_t ib = 0; ib < blockSize; ++ib)
-            {
-                size_t i = stepOffset + ib;
-                out[i] += tSum;
-            }
+            std::for_each(out + stepOffset, out + stepOffset + blockSize, [shift=tSum](T& val){ val += shift; });
         }
     }
 
     T stepSum = superBlock[(nSteps+1)%2][numThreads];
-    for (size_t i = nSteps * elementsPerStep; i < numElements; ++i)
-    {
-        out[i] = stepSum;
-        stepSum += in[i];
-    }
+    std::exclusive_scan(in + nSteps*elementsPerStep, in + numElements, out + nSteps*elementsPerStep, stepSum);
 }
 
 } // namespace v2

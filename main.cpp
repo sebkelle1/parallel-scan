@@ -63,6 +63,12 @@ void exclusiveScanSerialInplace(const T* in, T* out, std::size_t num_elements)
     }
 }
 
+template<class T>
+void exclusiveScanParallelInplace(const T* in, T* out, std::size_t num_elements)
+{
+    v1::exclusiveScan(out, num_elements);
+}
+
 int main(int argc, char** argv)
 {
     std::size_t numElements = 10000000;
@@ -85,10 +91,14 @@ int main(int argc, char** argv)
     test_scan("parallel v1", input, output, reference, v1::exclusiveScan<unsigned>);
 
     output = input;
+    test_scan("parallel v1 inplace", input, output, reference, exclusiveScanParallelInplace<unsigned>);
+
+    output = input;
     test_scan("parallel v2", input, output, reference, v2::exclusiveScan<unsigned>);
 
     benchmark_scan("serial", input, output, reference, exclusiveScanSerial<unsigned>);
     benchmark_scan("serial inplace", input, output, reference, exclusiveScanSerialInplace<unsigned>);
     benchmark_scan("parallel v1", input, output, reference, v1::exclusiveScan<unsigned>);
+    benchmark_scan("parallel v1 inplace", input, output, reference, exclusiveScanParallelInplace<unsigned>);
     benchmark_scan("parallel v2", input, output, reference, v2::exclusiveScan<unsigned>);
 }
