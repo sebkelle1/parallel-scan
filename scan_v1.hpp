@@ -41,7 +41,8 @@ namespace v1
 template<class T>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
-    constexpr int blockSize = (16384 + 32768) / sizeof(T);
+    constexpr int blockSize = (8192 + 16384) / sizeof(T);
+    //constexpr int blockSize = 4;
 
     int numThreads = 1;
     #pragma omp parallel
@@ -60,11 +61,9 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
     #pragma omp parallel num_threads(numThreads)
     {
         int tid = omp_get_thread_num();
-
-        // step 0
-        if (nSteps > 0)
+        for (size_t step = 0; step < nSteps; ++step)
         {
-            size_t stepOffset = tid * blockSize;
+            size_t stepOffset = step * elementsPerStep + tid * blockSize;
 
             T tSum = 0;
             for (size_t ib = 0; ib < blockSize; ++ib)
@@ -74,54 +73,20 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
                 out[i] = tSum;
                 tSum += in[i];
             }
-            superBlock[0][tid] = tSum;
-        }
-        #pragma omp barrier
 
-        for (size_t step = 1; step < nSteps; ++step)
-        {
-            size_t stepOffset  = step * elementsPerStep + tid * blockSize;
-            size_t shiftOffset = (step-1) * elementsPerStep + tid * blockSize;
-
-            size_t tShiftSum = superBlock[step%2][numThreads];
-            for (size_t t = 0; t < tid; ++t)
-                tShiftSum += superBlock[(step+1)%2][t];
-
-            if (tid == numThreads - 1)
-            {
-                superBlock[(step+1)%2][numThreads] = tShiftSum + superBlock[(step+1)%2][numThreads - 1];
-            }
-
-            T tLocalSum = 0;
-            for (size_t ib = 0; ib < blockSize; ++ib)
-            {
-                size_t i = stepOffset + ib;
-
-                out[i] = tLocalSum;
-                tLocalSum += in[i];
-
-                size_t iShift = shiftOffset + ib;
-                out[iShift] += tShiftSum;
-            }
-
-            superBlock[step%2][tid] = tLocalSum;
+            superBlock[step%2][tid] = tSum;
 
             #pragma omp barrier
-        }
 
-        // last step
-        if (nSteps > 0)
-        {
-            size_t tSum = superBlock[nSteps%2][numThreads];
+            tSum = superBlock[(step+1)%2][numThreads];
             for (size_t t = 0; t < tid; ++t)
-                tSum += superBlock[(nSteps+1)%2][t];
+                tSum += superBlock[step%2][t];
 
             if (tid == numThreads - 1)
             {
-                superBlock[(nSteps+1)%2][numThreads] = tSum + superBlock[(nSteps+1)%2][numThreads - 1];
+                superBlock[step%2][numThreads] = tSum + superBlock[step%2][numThreads - 1];
             }
 
-            size_t stepOffset = (nSteps-1) * elementsPerStep + tid * blockSize;
             for (size_t ib = 0; ib < blockSize; ++ib)
             {
                 size_t i = stepOffset + ib;
@@ -136,6 +101,7 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
         out[i] = stepSum;
         stepSum += in[i];
     }
+
 }
 
 } // namespace v1
