@@ -49,7 +49,6 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
     constexpr int clSize = 4096/sizeof(T);
 
     constexpr int maxThreads = 256;
-    //alignas(4096) T superBlock[2][maxThreads+1][clSize];
     T* sb_ = (T*)aligned_alloc(4096, 2 * (maxThreads+1) * clSize * sizeof(T));
     T (*superBlock)[maxThreads+1][clSize] = (T (*)[maxThreads+1][clSize]) sb_;  
 

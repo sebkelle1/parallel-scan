@@ -39,6 +39,7 @@
 #include "scan_stl.hpp"
 #include "scan_v1.hpp"
 #include "scan_v2.hpp"
+#include "scan_v3.hpp"
 #include "test.hpp"
 
 template<class T>
@@ -81,7 +82,7 @@ int main(int argc, char** argv)
     unsigned* output = (unsigned*)aligned_alloc(4096, numElements * sizeof(unsigned));
 
     // numa first touch
-    v1::exclusiveScan(input, output, numElements); 
+    v3::exclusiveScan(input, output, numElements); 
 
     std::fill(input, input+numElements, 1);
 
@@ -98,12 +99,16 @@ int main(int argc, char** argv)
     std::copy(input, input+numElements, output);
 
     test_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+    std::copy(input, input+numElements, output);
+
+    test_scan("parallel v3", input, output, numElements, reference, v3::exclusiveScan<unsigned>);
 
     benchmark_scan("serial", input, output, numElements, reference, exclusiveScanSerial<unsigned>);
     benchmark_scan("serial inplace", input, output, numElements, reference, exclusiveScanSerialInplace<unsigned>);
     benchmark_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned>);
     benchmark_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned>);
     benchmark_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+    benchmark_scan("parallel v3", input, output, numElements, reference, v3::exclusiveScan<unsigned>);
 
     free(input);
     free(output);
