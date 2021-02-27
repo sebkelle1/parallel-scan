@@ -36,6 +36,8 @@
 
 #include <omp.h>
 
+#include "scan_stl.hpp"
+
 namespace v2
 {
 
@@ -67,7 +69,7 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
         {
             size_t stepOffset = tid * blockSize;
 
-            std::exclusive_scan(in + stepOffset, in + stepOffset + blockSize, out + stepOffset, 0);
+            stl::exclusive_scan(in + stepOffset, in + stepOffset + blockSize, out + stepOffset, 0);
             superBlock[0][tid] = out[stepOffset + blockSize - 1] + in[stepOffset + blockSize - 1];
         }
         #pragma omp barrier
@@ -118,7 +120,7 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
     }
 
     T stepSum = superBlock[(nSteps+1)%2][numThreads];
-    std::exclusive_scan(in + nSteps*elementsPerStep, in + numElements, out + nSteps*elementsPerStep, stepSum);
+    stl::exclusive_scan(in + nSteps*elementsPerStep, in + numElements, out + nSteps*elementsPerStep, stepSum);
 }
 
 } // namespace v2

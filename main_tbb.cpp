@@ -58,7 +58,7 @@ int main(int argc, char** argv)
     std::vector<unsigned> reference(numElements);
     std::iota(begin(reference), end(reference), 0);
 
-    test_scan("STL parallel", input, output, reference, exclusiveScanSTL<unsigned>);
+    test_scan("STL parallel", input.data(), output.data(), numElements, reference, exclusiveScanSTL<unsigned>);
 
-    benchmark_scan("STL parallel", input, output, reference, exclusiveScanSTL<unsigned>);
+    benchmark_scan("STL parallel", input.data(), output.data(), numElements, reference, exclusiveScanSTL<unsigned>);
 }

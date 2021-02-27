@@ -36,16 +36,15 @@
 #include <vector>
 
 template<class T>
-void test_scan(std::string name, const std::vector<T>& input, std::vector<T>& output, const std::vector<T>& reference,
+void test_scan(std::string name, const T* input, T* output, size_t numElements, const std::vector<T>& reference,
                void(*func)(const T*, T*, std::size_t))
 {
-    std::size_t numElements = input.size();
-
     auto tp0 = std::chrono::high_resolution_clock::now();
-    func(input.data(), output.data(), numElements);
+    func(input, output, numElements);
     auto tp1  = std::chrono::high_resolution_clock::now();
 
-    bool pass = (output == reference);
+    //bool pass = (output == reference);
+    bool pass = std::equal(output, output+numElements, reference.data());
     double t0 = std::chrono::duration<double>(tp1 - tp0).count();
 
     if (pass)
@@ -56,29 +55,27 @@ void test_scan(std::string name, const std::vector<T>& input, std::vector<T>& ou
         std::cout << name << " scan test: FAIL\n";
         if (numElements <= 100)
         {
-            std::copy(begin(output), end(output), std::ostream_iterator<unsigned>(std::cout, " "));
+            std::copy(output, output+numElements, std::ostream_iterator<unsigned>(std::cout, " "));
             std::cout << std::endl;
         }
     }
 }
 
 template<class T>
-void benchmark_scan(std::string name, const std::vector<T>& input, std::vector<T>& output, const std::vector<T>& reference,
+void benchmark_scan(std::string name, const T* input, T* output, size_t numElements, const std::vector<T>& reference,
                     void(*func)(const T*, T*, std::size_t))
 {
-    std::size_t numElements = input.size();
-
     int repetitions = 30;
 
     // warmup
-    func(input.data(), output.data(), numElements);
+    func(input, output, numElements);
 
     auto tp0 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < repetitions; ++i)
     {
-        func(input.data(), output.data(), numElements);
+        func(input, output, numElements);
     }
-    auto tp1  = std::chrono::high_resolution_clock::now();
+    auto tp1 = std::chrono::high_resolution_clock::now();
 
     double t0 = std::chrono::duration<double>(tp1 - tp0).count();
 

@@ -32,9 +32,11 @@
 #include <iostream>
 #include <iterator>
 #include <numeric>
+#include <stdlib.h>
 #include <string>
 #include <vector>
 
+#include "scan_stl.hpp"
 #include "scan_v1.hpp"
 #include "scan_v2.hpp"
 #include "test.hpp"
@@ -42,12 +44,7 @@
 template<class T>
 void exclusiveScanSerial(const T* in, T* out, std::size_t num_elements)
 {
-    T sum = 0;
-    for (size_t i = 0; i < num_elements; ++i)
-    {
-        out[i] = sum;
-        sum += in[i];
-    }
+    stl::exclusive_scan(in, in+num_elements, out, size_t(0));
 }
 
 template<class T>
@@ -76,29 +73,38 @@ int main(int argc, char** argv)
         numElements = std::stoi(argv[1]);
 
     std::cout << "scanning " << numElements << " elements\n";
-    std::vector<unsigned> input(numElements, 1);
-    std::vector<unsigned> output(numElements);
 
     std::vector<unsigned> reference(numElements);
     std::iota(begin(reference), end(reference), 0);
 
-    test_scan("serial", input, output, reference, exclusiveScanSerial<unsigned>);
+    unsigned* input  = (unsigned*)aligned_alloc(4096, numElements * sizeof(unsigned));
+    unsigned* output = (unsigned*)aligned_alloc(4096, numElements * sizeof(unsigned));
 
-    output = input;
-    test_scan("serial inplace", input, output, reference, exclusiveScanSerialInplace<unsigned>);
+    // numa first touch
+    v1::exclusiveScan(input, output, numElements); 
 
-    output = input;
-    test_scan("parallel v1", input, output, reference, v1::exclusiveScan<unsigned>);
+    std::fill(input, input+numElements, 1);
 
-    output = input;
-    test_scan("parallel v1 inplace", input, output, reference, exclusiveScanParallelInplace<unsigned>);
+    test_scan("serial", input, output, numElements, reference, exclusiveScanSerial<unsigned>);
+    std::copy(input, input+numElements, output);
 
-    output = input;
-    test_scan("parallel v2", input, output, reference, v2::exclusiveScan<unsigned>);
+    test_scan("serial inplace", input, output, numElements, reference, exclusiveScanSerialInplace<unsigned>);
+    std::copy(input, input+numElements, output);
 
-    benchmark_scan("serial", input, output, reference, exclusiveScanSerial<unsigned>);
-    benchmark_scan("serial inplace", input, output, reference, exclusiveScanSerialInplace<unsigned>);
-    benchmark_scan("parallel v1", input, output, reference, v1::exclusiveScan<unsigned>);
-    benchmark_scan("parallel v1 inplace", input, output, reference, exclusiveScanParallelInplace<unsigned>);
-    benchmark_scan("parallel v2", input, output, reference, v2::exclusiveScan<unsigned>);
+    test_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned>);
+    std::copy(input, input+numElements, output);
+
+    test_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned>);
+    std::copy(input, input+numElements, output);
+
+    test_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+
+    benchmark_scan("serial", input, output, numElements, reference, exclusiveScanSerial<unsigned>);
+    benchmark_scan("serial inplace", input, output, numElements, reference, exclusiveScanSerialInplace<unsigned>);
+    benchmark_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned>);
+    benchmark_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned>);
+    benchmark_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+
+    free(input);
+    free(output);
 }

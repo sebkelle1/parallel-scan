@@ -33,8 +33,11 @@
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+#include <stdlib.h>
 
 #include <omp.h>
+
+#include "scan_stl.hpp"
 
 namespace v1
 {
@@ -43,17 +46,29 @@ template<class T>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
     constexpr int blockSize = (8192 + 16384) / sizeof(T);
+    constexpr int clSize = 4096/sizeof(T);
+
+    constexpr int maxThreads = 256;
+    //alignas(4096) T superBlock[2][maxThreads+1][clSize];
+    T* sb_ = (T*)aligned_alloc(4096, 2 * (maxThreads+1) * clSize * sizeof(T));
+    T (*superBlock)[maxThreads+1][clSize] = (T (*)[maxThreads+1][clSize]) sb_;  
 
     int numThreads = 1;
     #pragma omp parallel
     {
         #pragma omp single
         numThreads = omp_get_num_threads();
-    }
 
-    T superBlock[2][numThreads+1];
-    std::fill(superBlock[0], superBlock[0] + numThreads+1, 0);
-    std::fill(superBlock[1], superBlock[1] + numThreads+1, 0);
+        int tid = omp_get_thread_num();
+
+        superBlock[0][tid][0] = 0;
+        superBlock[1][tid][0] = 0;
+        if (tid == numThreads - 1)
+        {
+            superBlock[0][numThreads][0] = 0;
+            superBlock[1][numThreads][0] = 0;
+        }
+    }
 
     unsigned elementsPerStep = numThreads * blockSize;
     unsigned nSteps = numElements / elementsPerStep;
@@ -65,26 +80,28 @@ void exclusiveScan(const T* in, T* out, size_t numElements)
         {
             size_t stepOffset = step * elementsPerStep + tid * blockSize;
 
-            std::exclusive_scan(in + stepOffset, in + stepOffset + blockSize, out + stepOffset, 0);
+            stl::exclusive_scan(in + stepOffset, in + stepOffset + blockSize, out + stepOffset, 0);
 
-            superBlock[step%2][tid] = out[stepOffset + blockSize - 1] + in[stepOffset + blockSize -1];
+            superBlock[step%2][tid][0] = out[stepOffset + blockSize - 1] + in[stepOffset + blockSize -1];
 
             #pragma omp barrier
 
-            T tSum = superBlock[(step+1)%2][numThreads];
+            T tSum = superBlock[(step+1)%2][numThreads][0];
             for (size_t t = 0; t < tid; ++t)
-                tSum += superBlock[step%2][t];
+                tSum += superBlock[step%2][t][0];
 
             if (tid == numThreads - 1)
-                superBlock[step%2][numThreads] = tSum + superBlock[step%2][numThreads - 1];
+                superBlock[step%2][numThreads][0] = tSum + superBlock[step%2][numThreads - 1][0];
 
             std::for_each(out + stepOffset, out + stepOffset + blockSize, [shift=tSum](T& val){ val += shift; });
         }
     }
 
     // remainder
-    T stepSum = superBlock[(nSteps+1)%2][numThreads];
-    std::exclusive_scan(in + nSteps*elementsPerStep, in + numElements, out + nSteps*elementsPerStep, stepSum);
+    T stepSum = superBlock[(nSteps+1)%2][numThreads][0];
+    stl::exclusive_scan(in + nSteps*elementsPerStep, in + numElements, out + nSteps*elementsPerStep, stepSum);
+
+    free(sb_);
 }
 
 template<class T>
