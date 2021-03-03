@@ -46,7 +46,7 @@ template<class T>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
     constexpr int blockSize = (8192 + 16384) / sizeof(T);
-    constexpr int clSize = 4096/sizeof(T);
+    constexpr int clSize = 64/sizeof(T);
 
     constexpr int maxThreads = 256;
     T* sb_ = (T*)aligned_alloc(4096, 2 * (maxThreads+1) * clSize * sizeof(T));

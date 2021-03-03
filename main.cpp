@@ -81,10 +81,20 @@ int main(int argc, char** argv)
     unsigned* input  = (unsigned*)aligned_alloc(4096, numElements * sizeof(unsigned));
     unsigned* output = (unsigned*)aligned_alloc(4096, numElements * sizeof(unsigned));
 
-    // numa first touch
-    v3::exclusiveScan(input, output, numElements); 
+    int numThreads = 1;
+    #pragma omp parallel
+    {
+        #pragma omp single
+        numThreads = omp_get_num_threads();
+    }
 
-    std::fill(input, input+numElements, 1);
+    #pragma omp parallel for schedule(static, numElements/numThreads) // favors v3
+    //#pragma omp parallel for schedule(static, 6144)                 // favors v1
+    for (size_t i = 0; i < numElements; ++i)
+    {
+        input[i]  = 1;
+        output[i] = 1;
+    }
 
     test_scan("serial", input, output, numElements, reference, exclusiveScanSerial<unsigned>);
     std::copy(input, input+numElements, output);
