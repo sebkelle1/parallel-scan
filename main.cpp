@@ -61,10 +61,10 @@ void exclusiveScanSerialInplace(const T* in, T* out, std::size_t num_elements)
     }
 }
 
-template<class T>
+template<class T, int NPages>
 void exclusiveScanParallelInplace(const T* in, T* out, std::size_t num_elements)
 {
-    v1::exclusiveScan(out, num_elements);
+    v1::exclusiveScan<T, NPages>(out, num_elements);
 }
 
 int main(int argc, char** argv)
@@ -88,8 +88,11 @@ int main(int argc, char** argv)
         numThreads = omp_get_num_threads();
     }
 
-    #pragma omp parallel for schedule(static, numElements/numThreads) // favors v3
-    //#pragma omp parallel for schedule(static, 6144)                 // favors v1
+    [[maybe_unused]] constexpr int n4kPagesPerThread_haswell  = 5;
+    [[maybe_unused]] constexpr int n4kPagesPerThread_epycrome = 32;
+
+    #pragma omp parallel for schedule(static, numElements/numThreads)           // favors v3
+    //#pragma omp parallel for schedule(static, n4kPagesPerThread_epycrome * 1024)  // favors v1<32>
     for (size_t i = 0; i < numElements; ++i)
     {
         input[i]  = 1;
@@ -102,22 +105,22 @@ int main(int argc, char** argv)
     test_scan("serial inplace", input, output, numElements, reference, exclusiveScanSerialInplace<unsigned>);
     std::copy(input, input+numElements, output);
 
-    test_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned>);
+    test_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned, n4kPagesPerThread_epycrome>);
     std::copy(input, input+numElements, output);
 
-    test_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned>);
+    test_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned, n4kPagesPerThread_epycrome>);
     std::copy(input, input+numElements, output);
 
-    test_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+    test_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned, n4kPagesPerThread_epycrome>);
     std::copy(input, input+numElements, output);
 
     test_scan("parallel v3", input, output, numElements, reference, v3::exclusiveScan<unsigned>);
 
     benchmark_scan("serial", input, output, numElements, reference, exclusiveScanSerial<unsigned>);
     benchmark_scan("serial inplace", input, output, numElements, reference, exclusiveScanSerialInplace<unsigned>);
-    benchmark_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned>);
-    benchmark_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned>);
-    benchmark_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned>);
+    benchmark_scan("parallel v1", input, output, numElements, reference, v1::exclusiveScan<unsigned, n4kPagesPerThread_epycrome>);
+    benchmark_scan("parallel v1 inplace", input, output, numElements, reference, exclusiveScanParallelInplace<unsigned, n4kPagesPerThread_epycrome>);
+    benchmark_scan("parallel v2", input, output, numElements, reference, v2::exclusiveScan<unsigned, n4kPagesPerThread_epycrome>);
     benchmark_scan("parallel v3", input, output, numElements, reference, v3::exclusiveScan<unsigned>);
 
     free(input);

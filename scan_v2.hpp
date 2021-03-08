@@ -41,10 +41,10 @@
 namespace v2
 {
 
-template<class T>
+template<class T, int NPages>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
-    constexpr int blockSize = (4096 + 16384) / sizeof(T);
+    constexpr int blockSize = (NPages * 4096) / sizeof(T);
 
     int numThreads = 1;
     #pragma omp parallel

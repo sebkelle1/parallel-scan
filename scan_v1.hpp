@@ -42,10 +42,10 @@
 namespace v1
 {
 
-template<class T>
+template<class T, int NPages>
 void exclusiveScan(const T* in, T* out, size_t numElements)
 {
-    constexpr int blockSize = (8192 + 16384) / sizeof(T);
+    constexpr int blockSize = (NPages * 4096) / sizeof(T);
     constexpr int clSize = 64/sizeof(T);
 
     constexpr int maxThreads = 256;
@@ -117,10 +117,10 @@ T exclusiveScanSerialInplace(T* out, size_t num_elements, T init)
     return b;
 }
 
-template<class T>
+template<class T, int NPages>
 void exclusiveScan(T* out, size_t numElements)
 {
-    constexpr int blockSize = (2*16384) / sizeof(T);
+    constexpr int blockSize = (NPages * 4096) / sizeof(T);
 
     int numThreads = 1;
     #pragma omp parallel
